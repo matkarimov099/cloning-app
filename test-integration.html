@@ -1,0 +1,287 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CloneAI Integration Test</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 50px auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .test-section {
+            margin: 20px 0;
+            padding: 20px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+        }
+        .success { color: green; }
+        .error { color: red; }
+        .loading { color: blue; }
+        button {
+            background: #0066cc;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        button:hover {
+            background: #004499;
+        }
+        pre {
+            background: #f8f8f8;
+            padding: 10px;
+            border-radius: 5px;
+            overflow-x: auto;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🚀 CloneAI Integration Test</h1>
+        <p>Bu sahifa frontend va backend integrasiyasini test qilish uchun yaratilgan.</p>
+        
+        <div class="test-section">
+            <h3>1. Backend Health Check</h3>
+            <button onclick="testHealth()">Test Health Endpoint</button>
+            <div id="health-result"></div>
+        </div>
+
+        <div class="test-section">
+            <h3>2. Screenshot API Test</h3>
+            <button onclick="testScreenshot()">Test Screenshot</button>
+            <div id="screenshot-result"></div>
+        </div>
+
+        <div class="test-section">
+            <h3>3. Content Fetch Test</h3>
+            <button onclick="testContent()">Test Content Fetch</button>
+            <div id="content-result"></div>
+        </div>
+
+        <div class="test-section">
+            <h3>4. AI Analysis Test</h3>
+            <button onclick="testAIAnalysis()">Test AI Analysis</button>
+            <div id="ai-result"></div>
+        </div>
+
+        <div class="test-section">
+            <h3>5. Full Website Analysis</h3>
+            <input type="url" id="website-url" placeholder="https://example.com" value="https://www.google.com" style="width: 300px; padding: 8px;">
+            <button onclick="testFullAnalysis()">Analyze Website</button>
+            <div id="full-result"></div>
+        </div>
+    </div>
+
+    <script>
+        const BACKEND_URL = 'http://localhost:5000';
+
+        async function testHealth() {
+            const resultDiv = document.getElementById('health-result');
+            resultDiv.innerHTML = '<p class="loading">Testing health endpoint...</p>';
+            
+            try {
+                const response = await fetch(`${BACKEND_URL}/health`);
+                const data = await response.json();
+                
+                if (response.ok) {
+                    resultDiv.innerHTML = `
+                        <p class="success">✅ Health check successful!</p>
+                        <pre>${JSON.stringify(data, null, 2)}</pre>
+                    `;
+                } else {
+                    resultDiv.innerHTML = `<p class="error">❌ Health check failed: ${response.status}</p>`;
+                }
+            } catch (error) {
+                resultDiv.innerHTML = `<p class="error">❌ Network error: ${error.message}</p>`;
+            }
+        }
+
+        async function testScreenshot() {
+            const resultDiv = document.getElementById('screenshot-result');
+            resultDiv.innerHTML = '<p class="loading">Testing screenshot API...</p>';
+            
+            try {
+                const response = await fetch(`${BACKEND_URL}/api/screenshot`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ url: 'https://www.google.com' })
+                });
+                
+                const data = await response.json();
+                
+                if (response.ok) {
+                    resultDiv.innerHTML = `
+                        <p class="success">✅ Screenshot API working!</p>
+                        <p>Screenshot size: ${data.screenshot ? data.screenshot.length : 0} characters</p>
+                        <pre>${JSON.stringify(data, null, 2)}</pre>
+                    `;
+                } else {
+                    resultDiv.innerHTML = `<p class="error">❌ Screenshot failed: ${data.error}</p>`;
+                }
+            } catch (error) {
+                resultDiv.innerHTML = `<p class="error">❌ Network error: ${error.message}</p>`;
+            }
+        }
+
+        async function testContent() {
+            const resultDiv = document.getElementById('content-result');
+            resultDiv.innerHTML = '<p class="loading">Testing content fetch API...</p>';
+            
+            try {
+                const response = await fetch(`${BACKEND_URL}/api/fetch-content`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ url: 'https://www.google.com' })
+                });
+                
+                const data = await response.json();
+                
+                if (response.ok) {
+                    resultDiv.innerHTML = `
+                        <p class="success">✅ Content fetch working!</p>
+                        <p>Title: ${data.title}</p>
+                        <p>Content length: ${data.content ? data.content.length : 0} characters</p>
+                        <pre>${JSON.stringify(data, null, 2)}</pre>
+                    `;
+                } else {
+                    resultDiv.innerHTML = `<p class="error">❌ Content fetch failed: ${data.error}</p>`;
+                }
+            } catch (error) {
+                resultDiv.innerHTML = `<p class="error">❌ Network error: ${error.message}</p>`;
+            }
+        }
+
+        async function testAIAnalysis() {
+            const resultDiv = document.getElementById('ai-result');
+            resultDiv.innerHTML = '<p class="loading">Testing AI analysis API...</p>';
+            
+            try {
+                const response = await fetch(`${BACKEND_URL}/api/ai-analyze`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        prompt: 'Analyze this simple website',
+                        html: '<html><head><title>Test</title></head><body><h1>Welcome</h1><p>This is a test website</p></body></html>',
+                        image: ''
+                    })
+                });
+                
+                const data = await response.json();
+                
+                if (response.ok) {
+                    resultDiv.innerHTML = `
+                        <p class="success">✅ AI Analysis working!</p>
+                        <p>Provider: ${data.ai_provider}</p>
+                        <p>Components found: ${data.components ? data.components.length : 0}</p>
+                        <pre>${JSON.stringify(data, null, 2)}</pre>
+                    `;
+                } else {
+                    resultDiv.innerHTML = `<p class="error">❌ AI Analysis failed: ${data.error}</p>`;
+                }
+            } catch (error) {
+                resultDiv.innerHTML = `<p class="error">❌ Network error: ${error.message}</p>`;
+            }
+        }
+
+        async function testFullAnalysis() {
+            const resultDiv = document.getElementById('full-result');
+            const url = document.getElementById('website-url').value;
+            
+            if (!url) {
+                resultDiv.innerHTML = '<p class="error">❌ Please enter a URL</p>';
+                return;
+            }
+            
+            resultDiv.innerHTML = '<p class="loading">Running full website analysis...</p>';
+            
+            try {
+                // Step 1: Get screenshot
+                resultDiv.innerHTML += '<p class="loading">📸 Taking screenshot...</p>';
+                const screenshotResponse = await fetch(`${BACKEND_URL}/api/screenshot`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ url })
+                });
+                
+                if (!screenshotResponse.ok) {
+                    throw new Error('Screenshot failed');
+                }
+                
+                const screenshotData = await screenshotResponse.json();
+                
+                // Step 2: Get content
+                resultDiv.innerHTML += '<p class="loading">📄 Fetching content...</p>';
+                const contentResponse = await fetch(`${BACKEND_URL}/api/fetch-content`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ url })
+                });
+                
+                if (!contentResponse.ok) {
+                    throw new Error('Content fetch failed');
+                }
+                
+                const contentData = await contentResponse.json();
+                
+                // Step 3: AI Analysis
+                resultDiv.innerHTML += '<p class="loading">🧠 Running AI analysis...</p>';
+                const analysisResponse = await fetch(`${BACKEND_URL}/api/ai-analyze`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        prompt: `Analyze this website: ${url}`,
+                        html: contentData.html,
+                        image: screenshotData.screenshot
+                    })
+                });
+                
+                if (!analysisResponse.ok) {
+                    throw new Error('AI analysis failed');
+                }
+                
+                const analysisData = await analysisResponse.json();
+                
+                // Success!
+                resultDiv.innerHTML = `
+                    <p class="success">✅ Full analysis completed successfully!</p>
+                    <h4>Results Summary:</h4>
+                    <ul>
+                        <li><strong>Title:</strong> ${contentData.title}</li>
+                        <li><strong>Language:</strong> ${contentData.language}</li>
+                        <li><strong>Components found:</strong> ${analysisData.components ? analysisData.components.length : 0}</li>
+                        <li><strong>AI Provider:</strong> ${analysisData.ai_provider}</li>
+                        <li><strong>Accessibility Level:</strong> ${analysisData.accessibility ? analysisData.accessibility.level : 'N/A'}</li>
+                    </ul>
+                    <details>
+                        <summary>View Full Analysis Data</summary>
+                        <pre>${JSON.stringify(analysisData, null, 2)}</pre>
+                    </details>
+                `;
+                
+            } catch (error) {
+                resultDiv.innerHTML = `<p class="error">❌ Full analysis failed: ${error.message}</p>`;
+            }
+        }
+
+        // Run health check on page load
+        document.addEventListener('DOMContentLoaded', function() {
+            console.log('🚀 CloneAI Integration Test loaded');
+            console.log('Backend URL:', BACKEND_URL);
+        });
+    </script>
+</body>
+</html>
