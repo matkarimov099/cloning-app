@@ -6,9 +6,12 @@ import {
   Clock,
   Code,
   Copy,
+  Cpu,
   Download,
+  ExternalLink,
   FileCode,
   Globe,
+  Image,
   Layers,
   Layout,
   Loader2,
@@ -29,7 +32,7 @@ import {
   CardTitle,
 } from "@/shared/components/ui/card.tsx";
 import { Input } from "@/shared/components/ui/input.tsx";
-
+import { Separator } from "@/shared/components/ui/separator.tsx";
 import {
   Tabs,
   TabsContent,
@@ -161,7 +164,7 @@ export function WebsiteAnalyzer() {
       addLog("info", "Website HTML va screenshot olish...");
 
       const analysisResponse = await fetch(
-        "http://localhost:8000/api/analyze",
+        "http://localhost:3001/api/analyze",
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -194,7 +197,7 @@ export function WebsiteAnalyzer() {
       addLog("info", "React komponentlar yaratish...");
 
       const generateResponse = await fetch(
-        "http://localhost:8000/api/generate",
+        "http://localhost:3001/api/generate",
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -239,16 +242,18 @@ export function WebsiteAnalyzer() {
         return <CheckCircle className="w-4 h-4 text-green-600" />;
       case "error":
         return <AlertCircle className="w-4 h-4 text-red-600" />;
+      case "warning":
+        return <AlertCircle className="w-4 h-4 text-yellow-600" />;
       default:
         return <Clock className="w-4 h-4 text-blue-600" />;
     }
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-100">
-      <div className="w-full space-y-6 px-6 py-6">
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-100 p-2">
+      <div className="w-full max-w-none mx-auto space-y-4 px-2">
         {/* Header */}
-        <div className="text-center space-y-4 py-4">
+        <div className="text-center space-y-4">
           <div className="inline-flex items-center gap-2 px-4 py-2 bg-white/60 backdrop-blur-sm rounded-full border">
             <Sparkles className="w-4 h-4 text-blue-600" />
             <span className="text-sm font-medium text-gray-700">
@@ -266,59 +271,53 @@ export function WebsiteAnalyzer() {
         <Tabs
           value={activeTab}
           onValueChange={setActiveTab}
-          className="w-full space-y-6"
+          className="space-y-6"
         >
-          <TabsList className="grid w-full grid-cols-3 bg-white/80 backdrop-blur-sm h-14 text-base">
-            <TabsTrigger
-              value="analyzer"
-              className="flex items-center gap-2 text-base py-3"
-            >
-              <Settings className="w-5 h-5" />
+          <TabsList className="grid w-full grid-cols-3 bg-white/80 backdrop-blur-sm">
+            <TabsTrigger value="analyzer" className="flex items-center gap-2">
+              <Settings className="w-4 h-4" />
               Analyzer
             </TabsTrigger>
             <TabsTrigger
               value="results"
-              className="flex items-center gap-2 text-base py-3"
+              className="flex items-center gap-2"
               disabled={!analysis}
             >
-              <Layout className="w-5 h-5" />
+              <Layout className="w-4 h-4" />
               Natijalar
             </TabsTrigger>
-            <TabsTrigger
-              value="console"
-              className="flex items-center gap-2 text-base py-3"
-            >
-              <Monitor className="w-5 h-5" />
+            <TabsTrigger value="console" className="flex items-center gap-2">
+              <Monitor className="w-4 h-4" />
               Console
             </TabsTrigger>
           </TabsList>
 
           <TabsContent value="analyzer">
-            <div className="w-full space-y-6 px-0">
+            <div className="w-full space-y-6">
               {/* URL Input Card - Full Width */}
-              <Card className="bg-white/80 backdrop-blur-sm border-0 shadow-xl w-full mx-0">
-                <CardHeader className="px-8 py-6">
-                  <CardTitle className="flex items-center gap-2 text-xl">
-                    <Globe className="w-6 h-6 text-blue-600" />
+              <Card className="bg-white/80 backdrop-blur-sm border-0 shadow-xl">
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Globe className="w-5 h-5 text-blue-600" />
                     Website URL
                   </CardTitle>
-                  <CardDescription className="text-base">
+                  <CardDescription>
                     Tahlil qilmoqchi bo'lgan website URL manzilini kiriting
                   </CardDescription>
                 </CardHeader>
-                <CardContent className="space-y-6 px-8 pb-8">
-                  <div className="flex gap-4">
+                <CardContent className="space-y-4">
+                  <div className="flex gap-3">
                     <Input
                       placeholder="https://example.com"
                       value={url}
                       onChange={(e) => setUrl(e.target.value)}
-                      className="flex-1 h-14 text-lg px-4"
+                      className="flex-1 h-12 text-base"
                       disabled={isAnalyzing}
                     />
                     <Button
                       onClick={analyzeWebsite}
                       disabled={isAnalyzing || !url.trim()}
-                      className="h-14 px-10 text-lg bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700"
+                      className="h-12 px-8 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700"
                     >
                       {isAnalyzing ? (
                         <>
@@ -415,9 +414,9 @@ export function WebsiteAnalyzer() {
                             🔍 Aniqlangan komponentlar:
                           </h5>
                           <div className="space-y-2 max-h-64 overflow-y-auto">
-                            {analysis.components?.map((component) => (
+                            {analysis.components?.map((component, index) => (
                               <div
-                                key={component.id}
+                                key={index}
                                 className="flex items-center justify-between p-3 bg-gray-50 rounded-lg"
                               >
                                 <div className="flex items-center gap-2">
@@ -447,40 +446,42 @@ export function WebsiteAnalyzer() {
                               Framework va kutubxonalar:
                             </h5>
                             <div className="flex flex-wrap gap-2">
-                              {analysis.technologies.map((tech) => (
+                              {analysis.technologies.map((tech, index) => (
                                 <Badge
-                                  key={tech.name}
+                                  key={index}
                                   variant="secondary"
                                   className="text-xs"
                                 >
-                                  {tech.name}
+                                  {tech}
                                 </Badge>
                               ))}
                             </div>
                           </div>
                         )}
 
-                        <div className="space-y-3">
-                          <h5 className="font-medium text-gray-900">
-                            Website ma'lumotlari:
-                          </h5>
-                          <div className="space-y-2 text-sm">
-                            <div className="flex justify-between">
-                              <span className="text-gray-600">Title:</span>
-                              <span className="font-medium text-right max-w-xs truncate">
-                                {analysis.title}
-                              </span>
-                            </div>
-                            <div className="flex justify-between">
-                              <span className="text-gray-600">
-                                Description:
-                              </span>
-                              <span className="font-medium text-right max-w-xs truncate">
-                                {analysis.description}
-                              </span>
+                        {analysis.meta_info && (
+                          <div className="space-y-3">
+                            <h5 className="font-medium text-gray-900">
+                              Website ma'lumotlari:
+                            </h5>
+                            <div className="space-y-2 text-sm">
+                              <div className="flex justify-between">
+                                <span className="text-gray-600">Title:</span>
+                                <span className="font-medium text-right max-w-xs truncate">
+                                  {analysis.meta_info.title}
+                                </span>
+                              </div>
+                              <div className="flex justify-between">
+                                <span className="text-gray-600">
+                                  Description:
+                                </span>
+                                <span className="font-medium text-right max-w-xs truncate">
+                                  {analysis.meta_info.description}
+                                </span>
+                              </div>
                             </div>
                           </div>
-                        </div>
+                        )}
                       </div>
                     </div>
                   </CardContent>
@@ -544,11 +545,8 @@ export function WebsiteAnalyzer() {
                       </div>
 
                       <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
-                        {generationResult.components.map((component) => (
-                          <Card
-                            key={component.name}
-                            className="border border-gray-200"
-                          >
+                        {generationResult.components.map((component, index) => (
+                          <Card key={index} className="border border-gray-200">
                             <CardHeader className="pb-3">
                               <div className="flex items-center justify-between">
                                 <CardTitle className="text-lg flex items-center gap-2">

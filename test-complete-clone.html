@@ -1,0 +1,406 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CloneAI - Complete HTML Clone & Analysis</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        .loading { opacity: 0.6; pointer-events: none; }
+        .success { border-color: #10b981; background-color: #f0fdf4; }
+        .error { border-color: #ef4444; background-color: #fef2f2; }
+        .step { transition: all 0.3s ease; }
+        .step.active { border-color: #3b82f6; background-color: #eff6ff; }
+        .step.completed { border-color: #10b981; background-color: #f0fdf4; }
+        .preview-frame { width: 100%; height: 400px; border: 1px solid #e5e7eb; border-radius: 8px; }
+    </style>
+</head>
+<body class="bg-gray-50 p-8">
+    <div class="max-w-6xl mx-auto">
+        <!-- Header -->
+        <div class="text-center mb-8">
+            <h1 class="text-4xl font-bold text-gray-900 mb-2">🚀 CloneAI Complete</h1>
+            <p class="text-lg text-gray-600">Complete HTML Clone → React Component Generation</p>
+        </div>
+
+        <!-- Process Steps -->
+        <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
+            <div id="step1" class="step bg-white p-4 rounded-lg border-2 border-gray-200">
+                <div class="text-center">
+                    <div class="text-2xl mb-2">🌐</div>
+                    <h3 class="font-semibold">1. HTML Clone</h3>
+                    <p class="text-sm text-gray-600">Complete website download</p>
+                </div>
+            </div>
+            <div id="step2" class="step bg-white p-4 rounded-lg border-2 border-gray-200">
+                <div class="text-center">
+                    <div class="text-2xl mb-2">📄</div>
+                    <h3 class="font-semibold">2. HTML File</h3>
+                    <p class="text-sm text-gray-600">Save with assets</p>
+                </div>
+            </div>
+            <div id="step3" class="step bg-white p-4 rounded-lg border-2 border-gray-200">
+                <div class="text-center">
+                    <div class="text-2xl mb-2">🔍</div>
+                    <h3 class="font-semibold">3. Analysis</h3>
+                    <p class="text-sm text-gray-600">HTML structure analysis</p>
+                </div>
+            </div>
+            <div id="step4" class="step bg-white p-4 rounded-lg border-2 border-gray-200">
+                <div class="text-center">
+                    <div class="text-2xl mb-2">⚛️</div>
+                    <h3 class="font-semibold">4. Components</h3>
+                    <p class="text-sm text-gray-600">React TSX generation</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Control Panel -->
+        <div class="bg-white rounded-lg shadow-lg p-6 mb-8">
+            <h2 class="text-2xl font-semibold mb-4">🎛️ Control Panel</h2>
+            
+            <div class="mb-4">
+                <label class="block text-sm font-medium text-gray-700 mb-2">Website URL:</label>
+                <input type="text" id="urlInput" placeholder="https://example.com" 
+                       class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                       value="https://example.com">
+            </div>
+            
+            <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+                <button onclick="testHealth()" 
+                        class="bg-purple-500 hover:bg-purple-600 text-white px-4 py-2 rounded-md transition-colors">
+                    ❤️ Health Check
+                </button>
+                <button onclick="cloneWebsite()" 
+                        class="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-md transition-colors">
+                    🌐 Clone HTML
+                </button>
+                <button onclick="analyzeClone()" 
+                        class="bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded-md transition-colors" 
+                        id="analyzeBtn" disabled>
+                    🔍 Analyze HTML
+                </button>
+                <button onclick="completeProcess()" 
+                        class="bg-gradient-to-r from-purple-500 to-blue-500 hover:from-purple-600 hover:to-blue-600 text-white px-4 py-2 rounded-md transition-colors">
+                    🚀 Complete Process
+                </button>
+            </div>
+
+            <!-- Status Display -->
+            <div id="status" class="hidden p-4 rounded-md mb-4">
+                <div class="flex items-center">
+                    <div id="spinner" class="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-500 mr-2"></div>
+                    <span id="statusText">Processing...</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Clone Info -->
+        <div id="cloneInfo" class="bg-white rounded-lg shadow-lg p-6 mb-8 hidden">
+            <h3 class="text-xl font-semibold mb-4">📁 Clone Information</h3>
+            <div id="cloneDetails" class="grid grid-cols-1 md:grid-cols-2 gap-4"></div>
+            
+            <!-- Preview -->
+            <div class="mt-6">
+                <h4 class="text-lg font-semibold mb-2">👀 HTML Preview</h4>
+                <iframe id="previewFrame" class="preview-frame"></iframe>
+            </div>
+        </div>
+
+        <!-- Components Display -->
+        <div id="components" class="bg-white rounded-lg shadow-lg p-6 hidden">
+            <h3 class="text-xl font-semibold mb-4">🧩 Generated React Components</h3>
+            <div id="componentsContent"></div>
+        </div>
+
+        <!-- Raw Results -->
+        <div id="results" class="bg-white rounded-lg shadow-lg p-6 hidden">
+            <h3 class="text-xl font-semibold mb-4">📊 Raw Results</h3>
+            <pre id="resultsContent" class="bg-gray-100 p-4 rounded-md overflow-x-auto text-sm"></pre>
+        </div>
+    </div>
+
+    <script>
+        const API_BASE = 'http://localhost:9001';
+        let currentCloneId = null;
+        
+        function setStepStatus(stepNumber, status) {
+            const step = document.getElementById(`step${stepNumber}`);
+            step.className = `step bg-white p-4 rounded-lg border-2 ${status}`;
+            
+            if (status.includes('active')) {
+                step.classList.add('active');
+            } else if (status.includes('completed')) {
+                step.classList.add('completed');
+            }
+        }
+
+        function showStatus(text, type = 'loading') {
+            const status = document.getElementById('status');
+            const statusText = document.getElementById('statusText');
+            const spinner = document.getElementById('spinner');
+            
+            status.className = `p-4 rounded-md mb-4 ${type}`;
+            status.classList.remove('hidden');
+            statusText.textContent = text;
+            
+            if (type === 'loading') {
+                spinner.classList.remove('hidden');
+            } else {
+                spinner.classList.add('hidden');
+            }
+        }
+
+        function hideStatus() {
+            document.getElementById('status').classList.add('hidden');
+        }
+
+        function showResults(data) {
+            const results = document.getElementById('results');
+            const content = document.getElementById('resultsContent');
+            content.textContent = JSON.stringify(data, null, 2);
+            results.classList.remove('hidden');
+        }
+
+        function showCloneInfo(cloneData) {
+            const cloneInfo = document.getElementById('cloneInfo');
+            const details = document.getElementById('cloneDetails');
+            const previewFrame = document.getElementById('previewFrame');
+            
+            details.innerHTML = `
+                <div>
+                    <h4 class="font-semibold mb-2">Clone Details</h4>
+                    <p><strong>Clone ID:</strong> ${cloneData.clone_id}</p>
+                    <p><strong>Original URL:</strong> <a href="${cloneData.metadata.original_url}" target="_blank" class="text-blue-600 hover:underline">${cloneData.metadata.original_url}</a></p>
+                    <p><strong>Title:</strong> ${cloneData.metadata.title}</p>
+                    <p><strong>Status:</strong> <span class="px-2 py-1 bg-green-100 text-green-800 rounded">${cloneData.metadata.status}</span></p>
+                </div>
+                <div>
+                    <h4 class="font-semibold mb-2">Files</h4>
+                    <p><strong>HTML File:</strong> ${cloneData.html_file}</p>
+                    <div class="mt-2">
+                        <a href="${cloneData.preview_url}" target="_blank" 
+                           class="inline-block bg-blue-500 text-white px-3 py-1 rounded mr-2 hover:bg-blue-600">
+                            👀 Preview
+                        </a>
+                        <a href="${cloneData.download_url}" target="_blank" 
+                           class="inline-block bg-green-500 text-white px-3 py-1 rounded hover:bg-green-600">
+                            💾 Download
+                        </a>
+                    </div>
+                </div>
+            `;
+            
+            // Set preview frame
+            previewFrame.src = cloneData.preview_url;
+            
+            cloneInfo.classList.remove('hidden');
+            currentCloneId = cloneData.clone_id;
+            document.getElementById('analyzeBtn').disabled = false;
+        }
+
+        function showComponents(components) {
+            const componentsDiv = document.getElementById('components');
+            const content = document.getElementById('componentsContent');
+            
+            if (components && components.length > 0) {
+                content.innerHTML = components.map((comp, index) => `
+                    <div class="border border-gray-200 rounded-lg p-4 mb-4">
+                        <div class="flex justify-between items-start mb-2">
+                            <div>
+                                <h4 class="font-semibold text-lg">${comp.name}</h4>
+                                <p class="text-gray-600">${comp.description}</p>
+                            </div>
+                            <span class="px-2 py-1 bg-blue-100 text-blue-800 rounded text-sm">${comp.type}</span>
+                        </div>
+                        
+                        <div class="grid grid-cols-2 md:grid-cols-4 gap-2 mb-3 text-sm">
+                            <div><strong>Complexity:</strong> ${comp.complexity || 'N/A'}</div>
+                            <div><strong>Code Lines:</strong> ${comp.code ? comp.code.split('\\n').length : 0}</div>
+                            <div><strong>Dependencies:</strong> ${comp.dependencies ? comp.dependencies.length : 0}</div>
+                            <div><strong>Props:</strong> ${comp.props ? comp.props.length : 0}</div>
+                        </div>
+                        
+                        ${comp.code ? `
+                            <details class="mt-2">
+                                <summary class="cursor-pointer text-blue-600 hover:text-blue-800 font-medium">
+                                    📄 View React TypeScript Code
+                                </summary>
+                                <div class="mt-2 bg-gray-900 rounded-lg overflow-hidden">
+                                    <div class="bg-gray-800 px-4 py-2 text-gray-300 text-sm font-mono">
+                                        ${comp.name}.tsx
+                                    </div>
+                                    <pre class="text-gray-100 p-4 overflow-x-auto text-sm"><code>${comp.code}</code></pre>
+                                </div>
+                            </details>
+                        ` : ''}
+                    </div>
+                `).join('');
+                componentsDiv.classList.remove('hidden');
+            }
+        }
+
+        async function testHealth() {
+            showStatus('Checking server health...', 'loading');
+            setStepStatus(1, 'border-blue-500 bg-blue-50');
+            
+            try {
+                const response = await fetch(`${API_BASE}/health`);
+                const data = await response.json();
+                
+                if (response.ok) {
+                    showStatus('✅ Server is healthy!', 'success');
+                    setStepStatus(1, 'border-green-500 bg-green-50');
+                    showResults(data);
+                } else {
+                    showStatus('❌ Server health check failed', 'error');
+                    setStepStatus(1, 'border-red-500 bg-red-50');
+                    showResults(data);
+                }
+            } catch (error) {
+                showStatus('❌ Cannot connect to server', 'error');
+                setStepStatus(1, 'border-red-500 bg-red-50');
+                showResults({ error: error.message });
+            }
+            
+            setTimeout(hideStatus, 3000);
+        }
+
+        async function cloneWebsite() {
+            const url = document.getElementById('urlInput').value;
+            if (!url) {
+                alert('Please enter a URL');
+                return;
+            }
+
+            showStatus('🌐 Cloning website HTML...', 'loading');
+            setStepStatus(1, 'border-blue-500 bg-blue-50 active');
+            
+            try {
+                const response = await fetch(`${API_BASE}/api/clone-website`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ url })
+                });
+                
+                const data = await response.json();
+                
+                if (response.ok && data.success) {
+                    showStatus('✅ HTML clone completed!', 'success');
+                    setStepStatus(1, 'border-green-500 bg-green-50 completed');
+                    setStepStatus(2, 'border-green-500 bg-green-50 completed');
+                    showCloneInfo(data);
+                    showResults(data);
+                } else {
+                    showStatus('❌ Clone failed', 'error');
+                    setStepStatus(1, 'border-red-500 bg-red-50');
+                    showResults(data);
+                }
+            } catch (error) {
+                showStatus('❌ Clone error', 'error');
+                setStepStatus(1, 'border-red-500 bg-red-50');
+                showResults({ error: error.message });
+            }
+            
+            setTimeout(hideStatus, 3000);
+        }
+
+        async function analyzeClone() {
+            if (!currentCloneId) {
+                alert('Please clone a website first');
+                return;
+            }
+
+            showStatus('🔍 Analyzing HTML file...', 'loading');
+            setStepStatus(3, 'border-blue-500 bg-blue-50 active');
+            
+            try {
+                const response = await fetch(`${API_BASE}/api/analyze-clone/${currentCloneId}`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' }
+                });
+                
+                const data = await response.json();
+                
+                if (response.ok && data.success) {
+                    showStatus('✅ Analysis completed!', 'success');
+                    setStepStatus(3, 'border-green-500 bg-green-50 completed');
+                    setStepStatus(4, 'border-green-500 bg-green-50 completed');
+                    
+                    if (data.components) {
+                        showComponents(data.components);
+                    }
+                    showResults(data);
+                } else {
+                    showStatus('❌ Analysis failed', 'error');
+                    setStepStatus(3, 'border-red-500 bg-red-50');
+                    showResults(data);
+                }
+            } catch (error) {
+                showStatus('❌ Analysis error', 'error');
+                setStepStatus(3, 'border-red-500 bg-red-50');
+                showResults({ error: error.message });
+            }
+            
+            setTimeout(hideStatus, 3000);
+        }
+
+        async function completeProcess() {
+            const url = document.getElementById('urlInput').value;
+            if (!url) {
+                alert('Please enter a URL');
+                return;
+            }
+
+            showStatus('🚀 Running complete process...', 'loading');
+            
+            // Reset steps
+            for (let i = 1; i <= 4; i++) {
+                setStepStatus(i, 'border-gray-200');
+            }
+            
+            setStepStatus(1, 'border-blue-500 bg-blue-50 active');
+            
+            try {
+                const response = await fetch(`${API_BASE}/api/clone-and-analyze`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ url })
+                });
+                
+                const data = await response.json();
+                
+                if (response.ok && data.success) {
+                    showStatus('✅ Complete process finished!', 'success');
+                    
+                    // Mark all steps as completed
+                    for (let i = 1; i <= 4; i++) {
+                        setStepStatus(i, 'border-green-500 bg-green-50 completed');
+                    }
+                    
+                    showCloneInfo(data.clone);
+                    
+                    if (data.components) {
+                        showComponents(data.components);
+                    }
+                    
+                    showResults(data);
+                } else {
+                    showStatus('❌ Process failed', 'error');
+                    setStepStatus(1, 'border-red-500 bg-red-50');
+                    showResults(data);
+                }
+            } catch (error) {
+                showStatus('❌ Process error', 'error');
+                setStepStatus(1, 'border-red-500 bg-red-50');
+                showResults({ error: error.message });
+            }
+            
+            setTimeout(hideStatus, 3000);
+        }
+
+        // Auto test health on load
+        window.addEventListener('load', testHealth);
+    </script>
+</body>
+</html>

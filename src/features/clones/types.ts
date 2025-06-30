@@ -185,13 +185,20 @@ export interface GenerationOptions {
 // Generation Result Types
 export interface GenerationResult {
 	components: GeneratedComponent[];
+	analysis?: WebsiteAnalysis; // Added analysis field
 	files?: GeneratedFile[];
 	designSystem?: DesignSystem;
-	metadata?: Record<string, unknown>;
+	metadata?: {
+		url?: string;
+		timestamp?: string;
+		processingTime?: number;
+		model?: string;
+		[key: string]: unknown;
+	};
 	stats?: Record<string, unknown>;
 	success: boolean;
 	message?: string;
-	generatedAt: Date;
+	generatedAt?: Date;
 }
 
 export interface GeneratedComponent {

@@ -1,0 +1,1459 @@
+import {
+  AlertCircle,
+  ArrowRight,
+  Brain,
+  CheckCircle,
+  Clock,
+  Code,
+  Copy,
+  Cpu,
+  Download,
+  ExternalLink,
+  FileCode,
+  Globe,
+  Image,
+  Layers,
+  Loader2,
+  Monitor,
+  Settings,
+  Sparkles,
+} from "lucide-react";
+import { useState } from "react";
+import { Badge } from "@/shared/components/ui/badge.tsx";
+import { Button } from "@/shared/components/ui/button.tsx";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/shared/components/ui/card.tsx";
+import { Input } from "@/shared/components/ui/input.tsx";
+import { Separator } from "@/shared/components/ui/separator.tsx";
+import {
+  Tabs,
+  TabsContent,
+  TabsList,
+  TabsTrigger,
+} from "@/shared/components/ui/tabs.tsx";
+import type { GenerationResult, WebsiteAnalysis, ComponentAnalysis } from "../types";
+import { DevelopmentConsole } from "./DevelopmentConsole";
+
+interface AnalysisLog {
+  id: string;
+  timestamp: Date;
+  type: "info" | "warning" | "error" | "success";
+  message: string;
+  details?: string | Record<string, unknown>;
+}
+
+export function WebsiteAnalyzer() {
+  const [url, setUrl] = useState("");
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [analysis, setAnalysis] = useState<WebsiteAnalysis | null>(null);
+  const [generationResult, setGenerationResult] =
+    useState<GenerationResult | null>(null);
+  const [logs, setLogs] = useState<AnalysisLog[]>([]);
+  const [activeTab, setActiveTab] = useState("analyzer");
+
+  // New clone workflow state
+  const [cloneInfo, setCloneInfo] = useState<{
+    clone_id: string;
+    url: string;
+    timestamp: string;
+    total_size: number;
+    asset_count: number;
+    preview_url: string;
+    download_url: string;
+  } | null>(null);
+  const [isCloning, setIsCloning] = useState(false);
+  const [isGenerating, setIsGenerating] = useState(false);
+  const [workflowMode, setWorkflowMode] = useState<
+    "url-analysis" | "clone-only" | "step-by-step" | "full-auto"
+  >("url-analysis");
+  const [hasCompletedClone, setHasCompletedClone] = useState(false);
+  const [hasCompletedAnalysis, setHasCompletedAnalysis] = useState(false);
+  const [urlAnalysis, setUrlAnalysis] = useState<{
+    website_type: string;
+    technologies: string[];
+    title: string;
+    description: string;
+    meta_info: Record<string, string>;
+    performance_info: Record<string, unknown>;
+  } | null>(null);
+  const [isAnalyzingUrl, setIsAnalyzingUrl] = useState(false);
+
+  // Remove unused generator since we're calling API directly
+  // const generator = new ComponentGenerator();
+
+  // Log funksiyasi
+  const addLog = (
+    type: AnalysisLog["type"],
+    message: string,
+    details?: string | Record<string, unknown>
+  ) => {
+    const newLog: AnalysisLog = {
+      id: `log-${Date.now()}`,
+      timestamp: new Date(),
+      type,
+      message,
+      details,
+    };
+    setLogs((prev) => [...prev, newLog]);
+  };
+
+  const analyzeUrlOnly = async () => {
+    if (!url.trim()) {
+      addLog("error", "URL kiritilmagan!");
+      return;
+    }
+
+    setIsAnalyzingUrl(true);
+    clearLogs();
+
+    try {
+      addLog("info", `URL tahlili boshlandi: ${url}`);
+
+      // Make API call to analyze URL without cloning
+      const response = await fetch("http://localhost:9001/api/analyze-url", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ url: url.trim() }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(
+          `API Error: ${response.status} ${response.statusText} - ${
+            errorData.error || "Unknown error"
+          }`
+        );
+      }
+
+      const result = await response.json();
+
+      if (result.success) {
+        setUrlAnalysis(result.analysis);
+        addLog("success", "URL tahlili muvaffaqiyatli yakunlandi!");
+        addLog("info", `Website turi: ${result.analysis.website_type}`);
+        addLog("info", `Texnologiyalar: ${result.analysis.technologies.join(", ")}`);
+        setActiveTab("url-info");
+      } else {
+        addLog("error", "URL tahlilida xatolik yuz berdi");
+      }
+    } catch (error) {
+      console.error("URL analysis error:", error);
+      addLog(
+        "error",
+        `URL tahlili xatoligi: ${
+          error instanceof Error ? error.message : "Noma'lum xatolik"
+        }`
+      );
+    } finally {
+      setIsAnalyzingUrl(false);
+    }
+  };
+
+  const clearLogs = () => {
+    setLogs([]);
+  };
+
+  const getLogIcon = (type: AnalysisLog["type"]) => {
+    switch (type) {
+      case "success":
+        return <CheckCircle className="w-4 h-4 text-green-600" />;
+      case "error":
+        return <AlertCircle className="w-4 h-4 text-red-600" />;
+      case "warning":
+        return <AlertCircle className="w-4 h-4 text-yellow-600" />;
+      default:
+        return <Clock className="w-4 h-4 text-blue-600" />;
+    }
+  };
+
+  const cloneWebsite = async () => {
+    if (!url.trim()) {
+      addLog("error", "URL kiritilmagan!");
+      return;
+    }
+
+    setIsCloning(true);
+    clearLogs();
+
+    try {
+      addLog("info", `Website klonlash boshlandi: ${url}`);
+
+      const analyzer = new (
+        await import("../services/ai-analyzer")
+      ).AIWebsiteAnalyzer();
+      const result = await analyzer.cloneWebsite(url);
+
+      if (result.success) {
+        setCloneInfo({
+          clone_id: result.clone_id,
+          url: result.clone_info.url,
+          timestamp: result.clone_info.timestamp,
+          total_size: result.clone_info.total_size,
+          asset_count: result.clone_info.asset_count,
+          preview_url: result.preview_url,
+          download_url: result.download_url,
+        });
+        setHasCompletedClone(true);
+
+        addLog("success", "Website muvaffaqiyatli klonlandi!");
+        addLog("info", `Clone ID: ${result.clone_id}`);
+        addLog("info", `Fayllar soni: ${result.clone_info.asset_count}`);
+        addLog(
+          "info",
+          `Umumiy hajmi: ${(result.clone_info.total_size / 1024).toFixed(2)} KB`
+        );
+      } else {
+        addLog("error", "Klonlashda xatolik yuz berdi");
+      }
+    } catch (error) {
+      console.error("Clone error:", error);
+      addLog(
+        "error",
+        `Klonlash xatoligi: ${
+          error instanceof Error ? error.message : "Noma'lum xatolik"
+        }`
+      );
+    } finally {
+      setIsCloning(false);
+    }
+  };
+
+  const generateFromClone = async () => {
+    if (!cloneInfo) {
+      addLog("error", "Avval website ni klonlang!");
+      return;
+    }
+
+    setIsGenerating(true);
+
+    try {
+      addLog(
+        "info",
+        `Klondan komponentlar yaratish boshlandi: ${cloneInfo.clone_id}`
+      );
+
+      const analyzer = new (
+        await import("../services/ai-analyzer")
+      ).AIWebsiteAnalyzer();
+      const result = await analyzer.analyzeClone(cloneInfo.clone_id);
+
+      if (result.success) {
+        setGenerationResult(result);
+        if (result.analysis) {
+          setAnalysis(result.analysis);
+        }
+        setHasCompletedAnalysis(true);
+
+        addLog(
+          "success",
+          `${result.components.length} ta komponent yaratildi!`
+        );
+        result.components.forEach((comp, index) => {
+          addLog("info", `${index + 1}. ${comp.name}`);
+        });
+        setActiveTab("results");
+      } else {
+        addLog("error", "Komponent yaratishda xatolik");
+      }
+    } catch (error) {
+      console.error("Generation error:", error);
+      addLog(
+        "error",
+        `Komponent yaratish xatoligi: ${
+          error instanceof Error ? error.message : "Noma'lum xatolik"
+        }`
+      );
+    } finally {
+      setIsGenerating(false);
+    }
+  };
+
+  const runFullProcess = async () => {
+    if (!url.trim()) {
+      addLog("error", "URL kiritilmagan!");
+      return;
+    }
+
+    setIsAnalyzing(true);
+    clearLogs();
+
+    try {
+      addLog("info", `To'liq jarayon boshlandi: ${url}`);
+
+      const analyzer = new (
+        await import("../services/ai-analyzer")
+      ).AIWebsiteAnalyzer();
+      const result = await analyzer.cloneAndAnalyze(url);
+
+      if (result.success) {
+        // Clone ma'lumotlarini saqlash
+        setCloneInfo({
+          clone_id: result.clone_id,
+          url: result.metadata.url || url,
+          timestamp: result.metadata.timestamp || new Date().toISOString(),
+          total_size: 0,
+          asset_count: 0,
+          preview_url: result.preview_url,
+          download_url: result.download_url,
+        });
+        setHasCompletedClone(true);
+
+        // Generation natijalarini saqlash  
+        const generationResult: GenerationResult = {
+          success: true,
+          components: result.components.map((comp: ComponentAnalysis & { tsx_code?: string; css_code?: string; code?: string }) => ({
+            name: comp.name,
+            code: comp.tsx_code || comp.code || comp.generatedCode || '',
+            tsx_code: comp.tsx_code,
+            css_code: comp.css_code,
+            type: comp.type || comp.component_type || 'component',
+            description: comp.description || '',
+            dependencies: comp.dependencies || [],
+            props: comp.props || []
+          })),
+          analysis: result.analysis,
+          metadata: result.metadata,
+        };
+
+        setGenerationResult(generationResult);
+        if (result.analysis) {
+          setAnalysis(result.analysis);
+        }
+        setHasCompletedAnalysis(true);
+
+        addLog("success", "To'liq jarayon yakunlandi!");
+        addLog("info", `Clone ID: ${result.clone_id}`);
+        addLog("info", `${result.components.length} ta komponent yaratildi`);
+        setActiveTab("results");
+      } else {
+        addLog("error", "To'liq jarayonda xatolik");
+      }
+    } catch (error) {
+      console.error("Full process error:", error);
+      addLog(
+        "error",
+        `To'liq jarayon xatoligi: ${
+          error instanceof Error ? error.message : "Noma'lum xatolik"
+        }`
+      );
+    } finally {
+      setIsAnalyzing(false);
+    }
+  };
+
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-100 p-2">
+      <div className="w-full max-w-none mx-auto space-y-4">{/* Full width, no max-width restriction */}
+        {/* Header */}
+        <div className="text-center space-y-4">
+          <div className="inline-flex items-center gap-2 px-4 py-2 bg-white/60 backdrop-blur-sm rounded-full border">
+            <Sparkles className="w-4 h-4 text-blue-600" />
+            <span className="text-sm font-medium text-gray-700">
+              AI Website Analyzer
+            </span>
+          </div>
+          <h1 className="text-4xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
+            Website ni React komponentlarga aylantiring
+          </h1>
+          <p className="text-lg text-gray-600 max-w-2xl mx-auto">
+            Har qanday website URL ni kiritib, AI yordamida uning barcha
+            komponentlarini avtomatik React TSX formatida oling
+          </p>
+        </div>
+
+        {/* URL Input and Workflow Controls */}
+        <Card className="bg-white/80 backdrop-blur-sm border-0 shadow-xl">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Globe className="w-5 h-5 text-blue-600" />
+              Website URL
+            </CardTitle>
+            <CardDescription>
+              Tahlil qilmoqchi bo'lgan website URL manzilini kiriting
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-6">
+            <div className="flex gap-4">
+              <div className="flex-1">
+                <Input
+                  type="url"
+                  placeholder="https://example.com"
+                  value={url}
+                  onChange={(e) => setUrl(e.target.value)}
+                  className="h-12 text-lg"
+                  disabled={isCloning || isGenerating || isAnalyzing}
+                />
+              </div>
+            </div>
+
+            {/* Workflow Mode Selector */}
+            <div className="space-y-3">
+              <h4 className="font-medium text-gray-900">Workflow rejimi</h4>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+                <Button
+                  variant={workflowMode === "url-analysis" ? "default" : "outline"}
+                  onClick={() => setWorkflowMode("url-analysis")}
+                  className="text-xs"
+                  size="sm"
+                >
+                  🔍 URL tahlil
+                </Button>
+                <Button
+                  variant={workflowMode === "clone-only" ? "default" : "outline"}
+                  onClick={() => setWorkflowMode("clone-only")}
+                  className="text-xs"
+                  size="sm"
+                >
+                  📁 Faqat klon
+                </Button>
+                <Button
+                  variant={workflowMode === "step-by-step" ? "default" : "outline"}
+                  onClick={() => setWorkflowMode("step-by-step")}
+                  className="text-xs"
+                  size="sm"
+                >
+                  📋 Bosqichma-bosqich
+                </Button>
+                <Button
+                  variant={workflowMode === "full-auto" ? "default" : "outline"}
+                  onClick={() => setWorkflowMode("full-auto")}
+                  className="text-xs"
+                  size="sm"
+                >
+                  ⚡ Avtomatik to'liq
+                </Button>
+              </div>
+            </div>
+
+            {/* Action Buttons */}
+            {workflowMode === "url-analysis" ? (
+              <Button
+                onClick={analyzeUrlOnly}
+                disabled={isAnalyzingUrl || !url.trim()}
+                className="w-full"
+                size="lg"
+              >
+                {isAnalyzingUrl ? (
+                  <>
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    URL tahlil qilinmoqda...
+                  </>
+                ) : (
+                  <>
+                    <Globe className="h-4 w-4 mr-2" />
+                    🔍 URL ni tahlil qil
+                  </>
+                )}
+              </Button>
+            ) : workflowMode === "clone-only" ? (
+              <Button
+                onClick={cloneWebsite}
+                disabled={isCloning || !url.trim()}
+                className="w-full"
+                size="lg"
+              >
+                {isCloning ? (
+                  <>
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    Klonlanmoqda...
+                  </>
+                ) : (
+                  <>
+                    <Download className="h-4 w-4 mr-2" />
+                    📁 Website ni klon qil
+                  </>
+                )}
+              </Button>
+            ) : workflowMode === "step-by-step" ? (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <Button
+                  onClick={cloneWebsite}
+                  disabled={isCloning || !url.trim()}
+                  className="w-full"
+                  variant={hasCompletedClone ? "outline" : "default"}
+                >
+                  {isCloning ? (
+                    <>
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      Klonlanmoqda...
+                    </>
+                  ) : hasCompletedClone ? (
+                    <>
+                      <CheckCircle className="h-4 w-4 mr-2 text-green-600" />
+                      ✓ Klonlandi
+                    </>
+                  ) : (
+                    <>
+                      <Download className="h-4 w-4 mr-2" />
+                      1. Website ni klon qil
+                    </>
+                  )}
+                </Button>
+
+                <Button
+                  onClick={generateFromClone}
+                  disabled={isGenerating || !cloneInfo}
+                  className="w-full"
+                  variant={hasCompletedAnalysis ? "outline" : "default"}
+                >
+                  {isGenerating ? (
+                    <>
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      Yaratilmoqda...
+                    </>
+                  ) : hasCompletedAnalysis ? (
+                    <>
+                      <CheckCircle className="h-4 w-4 mr-2 text-green-600" />
+                      ✓ Komponentlar yaratildi
+                    </>
+                  ) : (
+                    <>
+                      <Code className="h-4 w-4 mr-2" />
+                      2. Komponentlar yarat
+                    </>
+                  )}
+                </Button>
+              </div>
+            ) : (
+              <Button
+                onClick={runFullProcess}
+                disabled={isAnalyzing || !url.trim()}
+                className="w-full"
+                size="lg"
+              >
+                {isAnalyzing ? (
+                  <>
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    To'liq tahlil jarayoni...
+                  </>
+                ) : hasCompletedAnalysis ? (
+                  <>
+                    <CheckCircle className="h-4 w-4 mr-2 text-green-600" />
+                    ✓ Tahlil yakunlandi
+                  </>
+                ) : (
+                  <>
+                    <Brain className="h-4 w-4 mr-2" />
+                    🚀 Avtomatik Klon + Tahlil
+                  </>
+                )}
+              </Button>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Main Content */}
+        <Tabs
+          value={activeTab}
+          onValueChange={setActiveTab}
+          className="space-y-6"
+        >
+          <TabsList className="grid w-full grid-cols-4 bg-white/80 backdrop-blur-sm">
+            <TabsTrigger
+              value="analyzer"
+              className="data-[state=active]:bg-blue-600 data-[state=active]:text-white"
+            >
+              <Monitor className="w-4 h-4 mr-2" />
+              Workflow
+            </TabsTrigger>
+            <TabsTrigger
+              value="url-info"
+              disabled={!urlAnalysis}
+              className="data-[state=active]:bg-blue-600 data-[state=active]:text-white"
+            >
+              <Globe className="w-4 h-4 mr-2" />
+              URL ma'lumot {urlAnalysis && "✓"}
+            </TabsTrigger>
+            <TabsTrigger
+              value="results"
+              disabled={!hasCompletedAnalysis}
+              className="data-[state=active]:bg-blue-600 data-[state=active]:text-white"
+            >
+              <FileCode className="w-4 h-4 mr-2" />
+              Komponentlar {hasCompletedAnalysis && "✓"}
+            </TabsTrigger>
+            <TabsTrigger
+              value="console"
+              className="data-[state=active]:bg-blue-600 data-[state=active]:text-white"
+            >
+              <Settings className="w-4 h-4 mr-2" />
+              Console
+            </TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="analyzer" className="space-y-4">
+            <div className="w-full">{/* Single full-width container instead of grid */}
+              {/* Workflow Status - Full Width */}
+              <Card className="bg-white/80 backdrop-blur-sm border-0 shadow-xl w-full mb-4">
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Cpu className="w-5 h-5 text-blue-600" />
+                    Workflow holati
+                  </CardTitle>
+                  <CardDescription>
+                    Joriy jarayonning bosqichlari
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">{/* Responsive grid for workflow items */}
+                    {/* Clone Status Card */}
+                    <div className={`p-6 rounded-lg border transition-all ${
+                      hasCompletedClone
+                        ? "bg-green-50 border-green-200"
+                        : isCloning
+                        ? "bg-blue-50 border-blue-200"
+                        : "bg-gray-50 border-gray-200"
+                    }`}>
+                      <div className="flex items-center gap-3 mb-3">
+                        <div className="p-2 rounded-full bg-white">
+                          {isCloning ? (
+                            <Loader2 className="w-6 h-6 animate-spin text-blue-600" />
+                          ) : hasCompletedClone ? (
+                            <CheckCircle className="w-6 h-6 text-green-600" />
+                          ) : (
+                            <Globe className="w-6 h-6 text-gray-400" />
+                          )}
+                        </div>
+                        <div>
+                          <h4 className="font-bold text-lg text-gray-900">
+                            1. Website klonlash
+                          </h4>
+                          <p className="text-sm text-gray-600">
+                            {isCloning ? "Klonlanmoqda..." : hasCompletedClone ? "Muvaffaqiyatli klonlandi" : "HTML va assetlarni to'liq saqlash"}
+                          </p>
+                        </div>
+                      </div>
+                      {hasCompletedClone && cloneInfo && (
+                        <div className="text-xs text-gray-600 space-y-1">
+                          <p>Clone ID: {cloneInfo.clone_id}</p>
+                          <p>Fayllar: {cloneInfo.asset_count}</p>
+                          <p>Hajmi: {(cloneInfo.total_size / 1024).toFixed(2)} KB</p>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Analysis Status Card */}
+                    <div className={`p-6 rounded-lg border transition-all ${
+                      hasCompletedAnalysis
+                        ? "bg-green-50 border-green-200"
+                        : isGenerating
+                        ? "bg-blue-50 border-blue-200"
+                        : "bg-gray-50 border-gray-200"
+                    }`}>
+                      <div className="flex items-center gap-3 mb-3">
+                        <div className="p-2 rounded-full bg-white">
+                          {isGenerating ? (
+                            <Loader2 className="w-6 h-6 animate-spin text-blue-600" />
+                          ) : hasCompletedAnalysis ? (
+                            <CheckCircle className="w-6 h-6 text-green-600" />
+                          ) : (
+                            <Brain className="w-6 h-6 text-gray-400" />
+                          )}
+                        </div>
+                        <div>
+                          <h4 className="font-bold text-lg text-gray-900">
+                            2. Komponent yaratish
+                          </h4>
+                          <p className="text-sm text-gray-600">
+                            {isGenerating ? "Komponentlar yaratilmoqda..." : hasCompletedAnalysis ? "Komponentlar tayyor" : "React TSX komponentlar generatsiya"}
+                          </p>
+                        </div>
+                      </div>
+                      {hasCompletedAnalysis && generationResult && (
+                        <div className="text-xs text-gray-600 space-y-1">
+                          <p>Komponentlar: {generationResult.components.length}</p>
+                          <p>Status: Tayyor</p>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* URL Analysis Status Card */}
+                    <div className={`p-6 rounded-lg border transition-all ${
+                      urlAnalysis
+                        ? "bg-green-50 border-green-200"
+                        : isAnalyzingUrl
+                        ? "bg-blue-50 border-blue-200"
+                        : "bg-gray-50 border-gray-200"
+                    }`}>
+                      <div className="flex items-center gap-3 mb-3">
+                        <div className="p-2 rounded-full bg-white">
+                          {isAnalyzingUrl ? (
+                            <Loader2 className="w-6 h-6 animate-spin text-blue-600" />
+                          ) : urlAnalysis ? (
+                            <CheckCircle className="w-6 h-6 text-green-600" />
+                          ) : (
+                            <Globe className="w-6 h-6 text-gray-400" />
+                          )}
+                        </div>
+                        <div>
+                          <h4 className="font-bold text-lg text-gray-900">
+                            URL Tahlili
+                          </h4>
+                          <p className="text-sm text-gray-600">
+                            {isAnalyzingUrl ? "URL tahlil qilinmoqda..." : urlAnalysis ? "Tahlil tayyor" : "Website ma'lumotlarini olish"}
+                          </p>
+                        </div>
+                      </div>
+                      {urlAnalysis && (
+                        <div className="text-xs text-gray-600 space-y-1">
+                          <p>Turi: {urlAnalysis.website_type}</p>
+                          <p>Texnologiyalar: {urlAnalysis.technologies.length}</p>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Overall Progress Summary */}
+                    <div className="p-6 bg-gradient-to-r from-blue-50 to-purple-50 rounded-lg border border-blue-200">
+                      <h4 className="font-bold text-lg text-gray-900 mb-3">Umumiy jarayon</h4>
+                      <div className="grid grid-cols-3 gap-4 text-center">
+                        <div className="p-3 bg-white rounded-lg">
+                          <div className="text-2xl font-bold text-blue-600">
+                            {urlAnalysis ? "✓" : "○"}
+                          </div>
+                          <div className="text-xs text-gray-600">URL Tahlili</div>
+                        </div>
+                        <div className="p-3 bg-white rounded-lg">
+                          <div className="text-2xl font-bold text-green-600">
+                            {hasCompletedClone ? "✓" : "○"}
+                          </div>
+                          <div className="text-xs text-gray-600">Klonlash</div>
+                        </div>
+                        <div className="p-3 bg-white rounded-lg">
+                          <div className="text-2xl font-bold text-purple-600">
+                            {hasCompletedAnalysis ? "✓" : "○"}
+                          </div>
+                          <div className="text-xs text-gray-600">Komponentlar</div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Live Logs - Full Width */}
+              <Card className="bg-white/80 backdrop-blur-sm border-0 shadow-xl w-full">
+                <CardHeader>
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <CardTitle className="flex items-center gap-2">
+                        <Image className="w-5 h-5 text-blue-600" />
+                        Live loglar
+                      </CardTitle>
+                      <CardDescription>
+                        Tahlil jarayonining batafsil loglari
+                      </CardDescription>
+                    </div>
+                    {logs.length > 0 && (
+                      <Button variant="outline" size="sm" onClick={clearLogs}>
+                        Tozalash
+                      </Button>
+                    )}
+                  </div>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-2 max-h-96 overflow-y-auto">
+                    {logs.length === 0 ? (
+                      <div className="text-center py-8 text-gray-500">
+                        <Clock className="w-8 h-8 mx-auto mb-2 opacity-50" />
+                        <p>Loglar bu yerda ko'rsatiladi</p>
+                      </div>
+                    ) : (
+                      logs.map((log) => (
+                        <div
+                          key={log.id}
+                          className="flex items-start gap-3 p-3 rounded-lg bg-gray-50 border border-gray-100"
+                        >
+                          {getLogIcon(log.type)}
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2">
+                              <span className="text-sm font-medium text-gray-900">
+                                {log.message}
+                              </span>
+                              <span className="text-xs text-gray-500">
+                                {log.timestamp.toLocaleTimeString()}
+                              </span>
+                            </div>
+                            {log.details && (
+                              <pre className="text-xs text-gray-600 mt-1 font-mono">
+                                {typeof log.details === "string"
+                                  ? log.details
+                                  : JSON.stringify(log.details, null, 2)}
+                              </pre>
+                            )}
+                          </div>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+          </TabsContent>
+
+          <TabsContent value="results" className="space-y-4">
+            {hasCompletedAnalysis && analysis && generationResult ? (
+              <div className="w-full space-y-4">{/* Full width container */}
+                {/* Combined Analysis & Components Card - Full Width */}
+                <Card className="bg-white/80 backdrop-blur-sm border-0 shadow-xl w-full">
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                      <Layers className="w-5 h-5 text-blue-600" />
+                      Tahlil natijalari va yaratilgan komponentlar
+                    </CardTitle>
+                    <CardDescription>
+                      To'liq tahlil natijasi va React TSX komponentlar
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                      {/* Left side - Analysis Summary */}
+                      <div className="space-y-6">
+                        <h4 className="font-bold text-lg text-gray-900">📊 Tahlil natijalari</h4>
+                        
+                        <div className="grid grid-cols-2 gap-4">
+                          <div className="text-center p-6 bg-blue-50 rounded-lg">
+                            <div className="text-3xl font-bold text-blue-600">
+                              {analysis.components?.length ||
+                                analysis.extracted_components?.length ||
+                                0}
+                            </div>
+                            <div className="text-sm text-gray-600 font-medium">
+                              Komponentlar
+                            </div>
+                          </div>
+                          <div className="text-center p-6 bg-purple-50 rounded-lg">
+                            <div className="text-3xl font-bold text-purple-600">
+                              {generationResult.components.length}
+                            </div>
+                            <div className="text-sm text-gray-600 font-medium">TSX fayllari</div>
+                          </div>
+                        </div>
+
+                        <div className="space-y-3">
+                          <h5 className="font-medium text-gray-900">
+                            🔍 Aniqlangan komponentlar:
+                          </h5>
+                          <div className="space-y-2 max-h-80 overflow-y-auto">
+                            {(
+                              analysis.components ||
+                              analysis.extracted_components ||
+                              []
+                            ).map((component, index) => (
+                              <div
+                                key={component.name || `component-${index}`}
+                                className="flex items-center justify-between p-3 bg-gray-50 rounded-lg"
+                              >
+                                <div>
+                                  <div className="font-medium text-gray-900">
+                                    {component.name ||
+                                      component.component_name ||
+                                      `Component ${index + 1}`}
+                                  </div>
+                                  <div className="text-sm text-gray-600">
+                                    {component.type ||
+                                      component.component_type ||
+                                      "Unknown"}
+                                  </div>
+                                </div>
+                                <Badge variant="secondary">
+                                  {component.complexity || "Basic"}
+                                </Badge>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Right side - Generated Components */}
+                      <div className="space-y-6">
+                        <div className="flex items-center justify-between">
+                          <h4 className="font-bold text-lg text-gray-900">⚡ Yaratilgan komponentlar</h4>
+                          <div className="flex gap-2">
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => {
+                                const allCode = generationResult.components
+                                  .map(
+                                    (comp) =>
+                                      `// ${comp.name}.tsx\n${
+                                        comp.tsx_code || comp.code
+                                      }`
+                                  )
+                                  .join(
+                                    "\n\n// ============================================\n\n"
+                                  );
+                                navigator.clipboard.writeText(allCode);
+                                addLog(
+                                  "success",
+                                  "Barcha komponentlar nusxalandi"
+                                );
+                              }}
+                            >
+                              <Copy className="w-4 h-4 mr-1" />
+                              Nusxalash
+                            </Button>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => {
+                                generationResult.components.forEach((comp) => {
+                                  const code = comp.tsx_code || comp.code;
+                                  const blob = new Blob([code], {
+                                    type: "text/typescript",
+                                  });
+                                  const url = URL.createObjectURL(blob);
+                                  const a = document.createElement("a");
+                                  a.href = url;
+                                  a.download = `${comp.name}.tsx`;
+                                  a.click();
+                                  URL.revokeObjectURL(url);
+                                });
+                                addLog("success", "Komponentlar yuklab olindi");
+                              }}
+                            >
+                              <Download className="w-4 h-4 mr-1" />
+                              Yuklash
+                            </Button>
+                          </div>
+                        </div>
+
+                        <div className="space-y-3 max-h-80 overflow-y-auto">
+                          {generationResult.components.map(
+                            (component, index) => (
+                              <div
+                                key={component.name || `component-${index}`}
+                                className="p-4 bg-gray-50 rounded-lg border hover:bg-gray-100 transition-colors"
+                              >
+                                <div className="flex items-center justify-between mb-3">
+                                  <span className="font-bold text-gray-900">
+                                    📄 {component.name}.tsx
+                                  </span>
+                                  <div className="flex gap-1">
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      onClick={() => {
+                                        const code =
+                                          component.tsx_code || component.code;
+                                        navigator.clipboard.writeText(code);
+                                        addLog(
+                                          "success",
+                                          `${component.name} komponenti nusxalandi`
+                                        );
+                                      }}
+                                    >
+                                      <Copy className="w-4 h-4" />
+                                    </Button>
+                                  </div>
+                                </div>
+                                <div className="bg-white p-3 rounded border">
+                                  <pre className="text-xs text-gray-600 font-mono overflow-x-auto max-h-32">
+{(component.tsx_code || component.code)?.slice(0, 300)}
+{(component.tsx_code || component.code)?.length > 300 && "..."}
+                                  </pre>
+                                </div>
+                                {component.description && (
+                                  <p className="text-xs text-gray-500 mt-2 italic">
+                                    💭 {component.description}
+                                  </p>
+                                )}
+                              </div>
+                            )
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                      <Layers className="w-5 h-5 text-blue-600" />
+                      Tahlil natijalari
+                    </CardTitle>
+                    <CardDescription>
+                      Aniqlangan komponentlar va strukturalar
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="text-center p-4 bg-blue-50 rounded-lg">
+                        <div className="text-2xl font-bold text-blue-600">
+                          {analysis.components?.length ||
+                            analysis.extracted_components?.length ||
+                            0}
+                        </div>
+                        <div className="text-sm text-gray-600">
+                          Komponentlar
+                        </div>
+                      </div>
+                      <div className="text-center p-4 bg-purple-50 rounded-lg">
+                        <div className="text-2xl font-bold text-purple-600">
+                          {analysis.pages?.length || 1}
+                        </div>
+                        <div className="text-sm text-gray-600">Sahifalar</div>
+                      </div>
+                    </div>
+
+                    <Separator />
+
+                    <div className="space-y-3">
+                      <h4 className="font-medium text-gray-900">
+                        Aniqlangan komponentlar:
+                      </h4>
+                      <div className="space-y-2 max-h-64 overflow-y-auto">
+                        {(
+                          analysis.components ||
+                          analysis.extracted_components ||
+                          []
+                        ).map((component, index) => (
+                          <div
+                            key={component.name || `component-${index}`}
+                            className="flex items-center justify-between p-3 bg-gray-50 rounded-lg"
+                          >
+                            <div>
+                              <div className="font-medium text-gray-900">
+                                {component.name ||
+                                  component.component_name ||
+                                  `Component ${index + 1}`}
+                              </div>
+                              <div className="text-sm text-gray-600">
+                                {component.type ||
+                                  component.component_type ||
+                                  "Unknown"}
+                              </div>
+                            </div>
+                            <Badge variant="secondary">
+                              {component.complexity || "Basic"}
+                            </Badge>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                {/* Generated Components */}
+                <Card className="bg-white/80 backdrop-blur-sm border-0 shadow-xl">
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                      <Code className="w-5 h-5 text-blue-600" />
+                      Yaratilgan komponentlar
+                    </CardTitle>
+                    <CardDescription>
+                      React TSX formatidagi komponentlar
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    {generationResult ? (
+                      <>
+                        <div className="flex items-center justify-between">
+                          <span className="text-sm text-gray-600">
+                            {generationResult.components.length} ta komponent
+                            yaratildi
+                          </span>
+                          <div className="flex gap-2">
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => {
+                                // Copy all components to clipboard
+                                const allCode = generationResult.components
+                                  .map(
+                                    (comp) =>
+                                      `// ${comp.name}.tsx\n${
+                                        comp.tsx_code || comp.code
+                                      }`
+                                  )
+                                  .join(
+                                    "\n\n// ============================================\n\n"
+                                  );
+                                navigator.clipboard.writeText(allCode);
+                                addLog(
+                                  "success",
+                                  "Barcha komponentlar nusxalandi"
+                                );
+                              }}
+                            >
+                              <Copy className="w-4 h-4 mr-2" />
+                              Nusxalash
+                            </Button>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => {
+                                // Create and download ZIP file
+                                generationResult.components.forEach((comp) => {
+                                  const code = comp.tsx_code || comp.code;
+                                  const blob = new Blob([code], {
+                                    type: "text/typescript",
+                                  });
+                                  const url = URL.createObjectURL(blob);
+                                  const a = document.createElement("a");
+                                  a.href = url;
+                                  a.download = `${comp.name}.tsx`;
+                                  a.click();
+                                  URL.revokeObjectURL(url);
+                                });
+                                addLog("success", "Komponentlar yuklab olindi");
+                              }}
+                            >
+                              <Download className="w-4 h-4 mr-2" />
+                              Yuklash
+                            </Button>
+                          </div>
+                        </div>
+
+                        <Separator />
+
+                        <div className="space-y-3 max-h-64 overflow-y-auto">
+                          {generationResult.components.map(
+                            (component, index) => (
+                              <div
+                                key={component.name || `component-${index}`}
+                                className="p-3 bg-gray-50 rounded-lg border"
+                              >
+                                <div className="flex items-center justify-between mb-2">
+                                  <span className="font-medium text-gray-900">
+                                    {component.name}.tsx
+                                  </span>
+                                  <div className="flex gap-1">
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      onClick={() => {
+                                        const code =
+                                          component.tsx_code || component.code;
+                                        navigator.clipboard.writeText(code);
+                                        addLog(
+                                          "success",
+                                          `${component.name} komponenti nusxalandi`
+                                        );
+                                      }}
+                                    >
+                                      <Copy className="w-4 h-4" />
+                                    </Button>
+                                    <Button variant="ghost" size="sm">
+                                      <ExternalLink className="w-4 h-4" />
+                                    </Button>
+                                  </div>
+                                </div>
+                                <pre className="text-xs text-gray-600 font-mono overflow-x-auto bg-white p-2 rounded border">
+                                  {(
+                                    component.tsx_code || component.code
+                                  )?.slice(0, 200)}
+                                  ...
+                                </pre>
+                                {component.description && (
+                                  <p className="text-xs text-gray-500 mt-1">
+                                    {component.description}
+                                  </p>
+                                )}
+                              </div>
+                            )
+                          )}
+                        </div>
+                      </>
+                    ) : (
+                      <div className="text-center py-8 text-gray-500">
+                        <FileCode className="w-8 h-8 mx-auto mb-2 opacity-50" />
+                        <p>Komponentlar hali yaratilmagan</p>
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+
+                {/* Clone Information & Actions */}
+                <Card className="bg-white/80 backdrop-blur-sm border-0 shadow-xl">
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                      <Download className="w-5 h-5 text-blue-600" />
+                      Klon ma'lumotlari
+                    </CardTitle>
+                    <CardDescription>
+                      Klonlangan website haqida ma'lumotlar va harakatlar
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    {cloneInfo ? (
+                      <>
+                        <div className="space-y-3">
+                          <div className="p-3 bg-green-50 rounded-lg border border-green-200">
+                            <h4 className="font-medium text-green-900 mb-2">Clone details</h4>
+                            <div className="space-y-1 text-sm text-green-700">
+                              <p><strong>Clone ID:</strong> {cloneInfo.clone_id}</p>
+                              <p><strong>URL:</strong> {cloneInfo.url}</p>
+                              <p><strong>Vaqt:</strong> {new Date(cloneInfo.timestamp).toLocaleString()}</p>
+                              <p><strong>Fayllar:</strong> {cloneInfo.asset_count}</p>
+                              <p><strong>Hajmi:</strong> {(cloneInfo.total_size / 1024).toFixed(2)} KB</p>
+                            </div>
+                          </div>
+
+                          <div className="grid grid-cols-2 gap-2">
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => window.open(cloneInfo.preview_url, "_blank")}
+                              className="w-full"
+                            >
+                              <ExternalLink className="h-4 w-4 mr-1" />
+                              Preview
+                            </Button>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => window.open(cloneInfo.download_url, "_blank")}
+                              className="w-full"
+                            >
+                              <Download className="h-4 w-4 mr-1" />
+                              Download
+                            </Button>
+                          </div>
+                        </div>
+
+                        {generationResult && (
+                          <>
+                            <Separator />
+                            <div className="space-y-2">
+                              <h4 className="font-medium text-gray-900">Natija statistikasi</h4>
+                              <div className="grid grid-cols-2 gap-3">
+                                <div className="text-center p-3 bg-blue-50 rounded-lg">
+                                  <div className="text-lg font-bold text-blue-600">
+                                    {generationResult.components.length}
+                                  </div>
+                                  <div className="text-xs text-gray-600">Komponentlar</div>
+                                </div>
+                                <div className="text-center p-3 bg-purple-50 rounded-lg">
+                                  <div className="text-lg font-bold text-purple-600">
+                                    {analysis?.components?.length || analysis?.extracted_components?.length || 0}
+                                  </div>
+                                  <div className="text-xs text-gray-600">Aniqlangan</div>
+                                </div>
+                              </div>
+                            </div>
+                          </>
+                        )}
+                      </>
+                    ) : (
+                      <div className="text-center py-8 text-gray-500">
+                        <Download className="w-8 h-8 mx-auto mb-2 opacity-50" />
+                        <p>Klon ma'lumotlari mavjud emas</p>
+                        <p className="text-xs mt-1">Avval website ni klonlang</p>
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              </div>
+            ) : (
+              <div className="text-center py-12">
+                <div className="bg-white/80 backdrop-blur-sm rounded-2xl p-8 border-0 shadow-xl max-w-md mx-auto">
+                  <Brain className="w-16 h-16 mx-auto mb-4 text-gray-400" />
+                  <h3 className="text-lg font-semibold text-gray-900 mb-2">
+                    {hasCompletedClone 
+                      ? "Komponentlar hali yaratilmagan" 
+                      : "Website hali klonlanmagan"}
+                  </h3>
+                  <p className="text-gray-600 mb-4">
+                    {hasCompletedClone 
+                      ? "Klonlangan website dan komponentlar yaratish uchun '2. Komponentlar yarat' tugmasini bosing"
+                      : "Avval website ni klonlang, so'ngra komponentlar yarating"}
+                  </p>
+                  <Button
+                    onClick={() => setActiveTab("analyzer")}
+                    className="bg-gradient-to-r from-blue-600 to-purple-600"
+                  >
+                    <ArrowRight className="w-4 h-4 mr-2" />
+                    {hasCompletedClone ? "Komponentlar yaratish" : "Klonlashga o'tish"}
+                  </Button>
+                </div>
+              </div>
+            )}
+          </TabsContent>
+
+          <TabsContent value="url-info" className="space-y-4">
+            {urlAnalysis ? (
+              <div className="w-full space-y-4">{/* Full width container with spacing */}
+                {/* Combined Website Information Card - Full Width */}
+                <Card className="bg-white/80 backdrop-blur-sm border-0 shadow-xl w-full">
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                      <Globe className="w-5 h-5 text-blue-600" />
+                      Website to'liq ma'lumotlari
+                    </CardTitle>
+                    <CardDescription>
+                      Barcha aniqlangan ma'lumotlar va texnologiyalar
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                      {/* Basic Info */}
+                      <div className="space-y-3">
+                        <h4 className="font-bold text-gray-900">Asosiy ma'lumotlar</h4>
+                        <div className="p-4 bg-blue-50 rounded-lg">
+                          <h5 className="font-medium text-blue-900">Website turi</h5>
+                          <p className="text-blue-700 text-sm">{urlAnalysis.website_type}</p>
+                        </div>
+                        
+                        <div className="p-4 bg-green-50 rounded-lg">
+                          <h5 className="font-medium text-green-900">Sarlavha</h5>
+                          <p className="text-green-700 text-sm">{urlAnalysis.title}</p>
+                        </div>
+                        
+                        {urlAnalysis.description && (
+                          <div className="p-4 bg-purple-50 rounded-lg">
+                            <h5 className="font-medium text-purple-900">Tavsif</h5>
+                            <p className="text-purple-700 text-sm">{urlAnalysis.description}</p>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Technologies */}
+                      <div className="space-y-3">
+                        <h4 className="font-bold text-gray-900">Texnologiyalar</h4>
+                        <div className="space-y-2 max-h-80 overflow-y-auto">
+                          {urlAnalysis.technologies.map((tech, index) => (
+                            <div
+                              key={`tech-${tech}-${index}`}
+                              className="flex items-center justify-between p-3 bg-gray-50 rounded-lg"
+                            >
+                              <span className="font-medium text-gray-900">{tech}</span>
+                              <Badge variant="secondary">Aniqlandi</Badge>
+                            </div>
+                          ))}
+                          {urlAnalysis.technologies.length === 0 && (
+                            <p className="text-gray-500 text-center py-4">
+                              Texnologiyalar aniqlanmadi
+                            </p>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Meta Info */}
+                      <div className="space-y-3">
+                        <h4 className="font-bold text-gray-900">Meta ma'lumotlar</h4>
+                        {Object.keys(urlAnalysis.meta_info).length > 0 ? (
+                          <div className="space-y-2 max-h-80 overflow-y-auto">
+                            {Object.entries(urlAnalysis.meta_info).map(([key, value]) => (
+                              <div key={`meta-${key}`} className="p-2 bg-gray-50 rounded text-xs">
+                                <span className="font-medium text-gray-600">{key}:</span>
+                                <span className="text-gray-500 ml-2 break-words">{value}</span>
+                              </div>
+                            ))}
+                          </div>
+                        ) : (
+                          <p className="text-gray-500 text-sm">Meta ma'lumotlar topilmadi</p>
+                        )}
+                      </div>
+
+                      {/* Performance Info */}
+                      <div className="space-y-3">
+                        <h4 className="font-bold text-gray-900">Performance ko'rsatkichlari</h4>
+                        {Object.keys(urlAnalysis.performance_info).length > 0 ? (
+                          <div className="space-y-2 max-h-80 overflow-y-auto">
+                            {Object.entries(urlAnalysis.performance_info).map(([key, value]) => (
+                              <div key={`perf-${key}`} className="p-2 bg-gray-50 rounded text-xs">
+                                <span className="font-medium text-gray-600">{key}:</span>
+                                <span className="text-gray-500 ml-2">{String(value)}</span>
+                              </div>
+                            ))}
+                          </div>
+                        ) : (
+                          <p className="text-gray-500 text-sm">Performance ma'lumotlari yo'q</p>
+                        )}
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
+            ) : (
+              <div className="text-center py-12">
+                <div className="bg-white/80 backdrop-blur-sm rounded-2xl p-8 border-0 shadow-xl max-w-md mx-auto">
+                  <Globe className="w-16 h-16 mx-auto mb-4 text-gray-400" />
+                  <h3 className="text-lg font-semibold text-gray-900 mb-2">
+                    URL tahlili mavjud emas
+                  </h3>
+                  <p className="text-gray-600 mb-4">
+                    Website haqida ma'lumot olish uchun URL ni kiriting va "URL ni tahlil qil" tugmasini bosing
+                  </p>
+                  <Button
+                    onClick={() => setActiveTab("analyzer")}
+                    className="bg-gradient-to-r from-blue-600 to-purple-600"
+                  >
+                    <ArrowRight className="w-4 h-4 mr-2" />
+                    Tahlilga o'tish
+                  </Button>
+                </div>
+              </div>
+            )}
+          </TabsContent>
+
+          <TabsContent value="console">
+            <DevelopmentConsole
+              logs={logs}
+              isRunning={isAnalyzing}
+              onClear={clearLogs}
+            />
+          </TabsContent>
+        </Tabs>
+
+        {/* Clone Info Display */}
+        {cloneInfo && (
+          <Card className="bg-green-50 border-green-200">
+            <CardHeader>
+              <CardTitle className="text-green-800 flex items-center gap-2">
+                <CheckCircle className="h-5 w-5" />
+                Website muvaffaqiyatli klonlandi
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-2">
+              <div className="text-sm text-green-700">
+                <p>
+                  <strong>Clone ID:</strong> {cloneInfo.clone_id}
+                </p>
+                <p>
+                  <strong>URL:</strong> {cloneInfo.url}
+                </p>
+                <p>
+                  <strong>Vaqt:</strong>{" "}
+                  {new Date(cloneInfo.timestamp).toLocaleString()}
+                </p>
+                <p>
+                  <strong>Fayllar:</strong> {cloneInfo.asset_count}
+                </p>
+                <p>
+                  <strong>Hajmi:</strong>{" "}
+                  {(cloneInfo.total_size / 1024).toFixed(2)} KB
+                </p>
+              </div>
+              <div className="flex gap-2 pt-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => window.open(cloneInfo.preview_url, "_blank")}
+                >
+                  <ExternalLink className="h-4 w-4 mr-1" />
+                  Preview
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => window.open(cloneInfo.download_url, "_blank")}
+                >
+                  <Download className="h-4 w-4 mr-1" />
+                  Download
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+      </div>
+    </div>
+  );
+}
