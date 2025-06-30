@@ -1,21 +1,21 @@
 import { useState } from "react";
-import { Button } from "../../../shared/components/ui/button";
-import { Input } from "../../../shared/components/ui/input";
+import { Button } from "@/shared/components/ui/button.tsx";
+import { Input } from "@/shared/components/ui/input.tsx";
 import {
   Card,
   CardContent,
   CardDescription,
   CardHeader,
   CardTitle,
-} from "../../../shared/components/ui/card";
-import { Badge } from "../../../shared/components/ui/badge";
-import { Separator } from "../../../shared/components/ui/separator";
+} from "@/shared/components/ui/card.tsx";
+import { Badge } from "@/shared/components/ui/badge.tsx";
+import { Separator } from "@/shared/components/ui/separator.tsx";
 import {
   Tabs,
   TabsContent,
   TabsList,
   TabsTrigger,
-} from "../../../shared/components/ui/tabs";
+} from "@/shared/components/ui/tabs.tsx";
 import {
   Loader2,
   Globe,
@@ -39,14 +39,8 @@ import {
   Layers,
   Brain,
 } from "lucide-react";
-import { AIWebsiteAnalyzer } from "../services/ai-analyzer";
-import { ComponentGenerator } from "../services/component-generator";
 import { DevelopmentConsole } from "./DevelopmentConsole";
-import type {
-  WebsiteAnalysis,
-  GenerationOptions,
-  GenerationResult,
-} from "../types";
+import type { WebsiteAnalysis, GenerationResult } from "../types";
 
 interface AnalysisStep {
   id: string;
@@ -113,18 +107,8 @@ export function WebsiteAnalyzer() {
     },
   ]);
 
-  const [options] = useState<GenerationOptions>({
-    framework: "react",
-    styling: "tailwind",
-    typescript: true,
-    responsive: true,
-    accessibility: true,
-    optimization: true,
-    componentLibrary: "shadcn",
-  });
-
-  const analyzer = new AIWebsiteAnalyzer();
-  const generator = new ComponentGenerator();
+  // Remove unused generator since we're calling API directly
+  // const generator = new ComponentGenerator();
 
   // Log funksiyasi
   const addLog = (
@@ -191,41 +175,72 @@ export function WebsiteAnalyzer() {
       updateStep(1, "loading");
       addLog("info", "AI tahlil boshlandi...");
 
-      const websiteAnalysis = await analyzer.analyzeWebsite(url);
-      setAnalysis(websiteAnalysis);
+      // Real API call to production backend
+      const response = await fetch(
+        "http://localhost:8000/api/analyze-website",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ url: url.trim() }),
+        }
+      );
 
-      await new Promise((resolve) => setTimeout(resolve, 3000));
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(
+          `API Error: ${response.status} ${response.statusText} - ${
+            errorData.error || "Unknown error"
+          }`
+        );
+      }
+
+      const result = await response.json();
+
+      if (!result.success) {
+        throw new Error(result.error || "Analysis failed");
+      }
+
+      // Backend returns complete analysis and components in one call
+      setAnalysis(result.analysis);
+
       updateStep(1, "completed", 3.2);
       addLog(
         "success",
-        `${websiteAnalysis.components.length} ta komponent aniqlandi`
+        `${result.analysis.components?.length || 0} ta komponent aniqlandi`
       );
 
-      // Step 3: Extract
+      // Step 3: Extract (already done by backend)
       setCurrentStep(2);
       updateStep(2, "loading");
       addLog("info", "Komponentlar ajratilmoqda...");
 
-      await new Promise((resolve) => setTimeout(resolve, 1500));
-      updateStep(2, "completed", 1.7);
+      await new Promise((resolve) => setTimeout(resolve, 500));
+      updateStep(2, "completed", 0.5);
       addLog("success", "Komponentlar muvaffaqiyatli ajratildi");
 
-      // Step 4: Generate
+      // Step 4: Generate (already done by backend)
       setCurrentStep(3);
       updateStep(3, "loading");
       addLog("info", "React komponentlar yaratilmoqda...");
 
-      const result = await generator.generateComponents(
-        websiteAnalysis,
-        options
-      );
-      setGenerationResult(result);
+      // Set the generated components from backend response
+      if (result.components && result.components.length > 0) {
+        setGenerationResult({
+          files: [], message: "", success: false,
+          components: result.components,
+          designSystem: result.analysis.designSystem,
+          metadata: result.analysis.metadata,
+          generatedAt: new Date(),
+        });
+      }
 
-      await new Promise((resolve) => setTimeout(resolve, 2500));
-      updateStep(3, "completed", 2.8);
+      await new Promise((resolve) => setTimeout(resolve, 500));
+      updateStep(3, "completed", 0.5);
       addLog(
         "success",
-        `${result.components.length} ta React komponent yaratildi`
+        `${result.components?.length || 0} ta React komponent yaratildi`
       );
 
       // Step 5: Style
@@ -243,7 +258,33 @@ export function WebsiteAnalyzer() {
       const errorMessage =
         error instanceof Error ? error.message : "Noma'lum xato";
       updateStep(currentStep, "error");
-      addLog("error", "Tahlil jarayonida xato yuz berdi", errorMessage);
+
+      // More detailed error logging
+      if (error instanceof Error) {
+        addLog("error", "Tahlil jarayonida xato yuz berdi", {
+          message: error.message,
+          stack: error.stack?.slice(0, 500),
+        });
+      } else {
+        addLog("error", "Tahlil jarayonida xato yuz berdi", errorMessage);
+      }
+
+      // Show user-friendly error message
+      if (errorMessage.includes("fetch")) {
+        addLog(
+          "error",
+          "Server bilan aloqa o'rnatishda muammo",
+          "Backend serverining ishlab turganini tekshiring"
+        );
+      } else if (errorMessage.includes("timeout")) {
+        addLog(
+          "error",
+          "So'rov vaqti tugadi",
+          "Website juda katta yoki sekin javob bermoqda"
+        );
+      } else if (errorMessage.includes("404")) {
+        addLog("error", "Website topilmadi", "URL to'g'riligini tekshiring");
+      }
     } finally {
       setIsAnalyzing(false);
     }
@@ -512,7 +553,9 @@ export function WebsiteAnalyzer() {
                     <div className="grid grid-cols-2 gap-4">
                       <div className="text-center p-4 bg-blue-50 rounded-lg">
                         <div className="text-2xl font-bold text-blue-600">
-                          {analysis.components.length}
+                          {analysis.components?.length ||
+                            analysis.extracted_components?.length ||
+                            0}
                         </div>
                         <div className="text-sm text-gray-600">
                           Komponentlar
@@ -533,21 +576,29 @@ export function WebsiteAnalyzer() {
                         Aniqlangan komponentlar:
                       </h4>
                       <div className="space-y-2 max-h-64 overflow-y-auto">
-                        {analysis.components.map((component) => (
+                        {(
+                          analysis.components ||
+                          analysis.extracted_components ||
+                          []
+                        ).map((component, index) => (
                           <div
-                            key={component.name}
+                            key={component.name || `component-${index}`}
                             className="flex items-center justify-between p-3 bg-gray-50 rounded-lg"
                           >
                             <div>
                               <div className="font-medium text-gray-900">
-                                {component.name}
+                                {component.name ||
+                                  component.component_name ||
+                                  `Component ${index + 1}`}
                               </div>
                               <div className="text-sm text-gray-600">
-                                {component.type}
+                                {component.type ||
+                                  component.component_type ||
+                                  "Unknown"}
                               </div>
                             </div>
                             <Badge variant="secondary">
-                              {component.complexity}
+                              {component.complexity || "Basic"}
                             </Badge>
                           </div>
                         ))}
@@ -576,11 +627,51 @@ export function WebsiteAnalyzer() {
                             yaratildi
                           </span>
                           <div className="flex gap-2">
-                            <Button variant="outline" size="sm">
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => {
+                                // Copy all components to clipboard
+                                const allCode = generationResult.components
+                                  .map(
+                                    (comp) =>
+                                      `// ${comp.name}.tsx\n${
+                                        comp.tsx_code || comp.code
+                                      }`
+                                  )
+                                  .join(
+                                    "\n\n// ============================================\n\n"
+                                  );
+                                navigator.clipboard.writeText(allCode);
+                                addLog(
+                                  "success",
+                                  "Barcha komponentlar nusxalandi"
+                                );
+                              }}
+                            >
                               <Copy className="w-4 h-4 mr-2" />
                               Nusxalash
                             </Button>
-                            <Button variant="outline" size="sm">
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => {
+                                // Create and download ZIP file
+                                generationResult.components.forEach((comp) => {
+                                  const code = comp.tsx_code || comp.code;
+                                  const blob = new Blob([code], {
+                                    type: "text/typescript",
+                                  });
+                                  const url = URL.createObjectURL(blob);
+                                  const a = document.createElement("a");
+                                  a.href = url;
+                                  a.download = `${comp.name}.tsx`;
+                                  a.click();
+                                  URL.revokeObjectURL(url);
+                                });
+                                addLog("success", "Komponentlar yuklab olindi");
+                              }}
+                            >
                               <Download className="w-4 h-4 mr-2" />
                               Yuklash
                             </Button>
@@ -590,24 +681,51 @@ export function WebsiteAnalyzer() {
                         <Separator />
 
                         <div className="space-y-3 max-h-64 overflow-y-auto">
-                          {generationResult.components.map((component) => (
-                            <div
-                              key={component.name}
-                              className="p-3 bg-gray-50 rounded-lg border"
-                            >
-                              <div className="flex items-center justify-between mb-2">
-                                <span className="font-medium text-gray-900">
-                                  {component.name}.tsx
-                                </span>
-                                <Button variant="ghost" size="sm">
-                                  <ExternalLink className="w-4 h-4" />
-                                </Button>
+                          {generationResult.components.map(
+                            (component, index) => (
+                              <div
+                                key={component.name || `component-${index}`}
+                                className="p-3 bg-gray-50 rounded-lg border"
+                              >
+                                <div className="flex items-center justify-between mb-2">
+                                  <span className="font-medium text-gray-900">
+                                    {component.name}.tsx
+                                  </span>
+                                  <div className="flex gap-1">
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      onClick={() => {
+                                        const code =
+                                          component.tsx_code || component.code;
+                                        navigator.clipboard.writeText(code);
+                                        addLog(
+                                          "success",
+                                          `${component.name} komponenti nusxalandi`
+                                        );
+                                      }}
+                                    >
+                                      <Copy className="w-4 h-4" />
+                                    </Button>
+                                    <Button variant="ghost" size="sm">
+                                      <ExternalLink className="w-4 h-4" />
+                                    </Button>
+                                  </div>
+                                </div>
+                                <pre className="text-xs text-gray-600 font-mono overflow-x-auto bg-white p-2 rounded border">
+                                  {(
+                                    component.tsx_code || component.code
+                                  )?.slice(0, 200)}
+                                  ...
+                                </pre>
+                                {component.description && (
+                                  <p className="text-xs text-gray-500 mt-1">
+                                    {component.description}
+                                  </p>
+                                )}
                               </div>
-                              <pre className="text-xs text-gray-600 font-mono overflow-x-auto">
-                                {component.code.slice(0, 150)}...
-                              </pre>
-                            </div>
-                          ))}
+                            )
+                          )}
                         </div>
                       </>
                     ) : (

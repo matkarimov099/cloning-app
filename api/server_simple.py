@@ -728,7 +728,7 @@ def home():
     })
 
 if __name__ == '__main__':
-    port = int(os.getenv('API_PORT', 5000))
+    port = int(os.getenv('API_PORT', 8000))
     host = os.getenv('API_HOST', '0.0.0.0')
     
     print(f"🚀 CloneAI Backend starting...")

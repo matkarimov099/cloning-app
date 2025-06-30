@@ -2,7 +2,7 @@ import type { WebsiteAnalysis, GenerationResult, GenerationOptions } from '../ty
 
 export class AIWebsiteAnalyzer {
   private apiKey?: string;
-  private baseUrl = 'http://localhost:5000'; // Backend server URL
+  private baseUrl = 'http://localhost:8000'; // Backend server URL
 
   constructor(apiKey?: string) {
     this.apiKey = apiKey;

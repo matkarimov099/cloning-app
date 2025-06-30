@@ -13,6 +13,7 @@ export interface WebsiteAnalysis {
   };
   structure: PageStructure;
   components: ComponentAnalysis[];
+  extracted_components?: ComponentAnalysis[]; // For backend compatibility
   pages?: PageInfo[];
   assets: AssetInfo[];
   technologies: DetectedTechnology[];
@@ -40,7 +41,9 @@ export interface PageSection {
 export interface ComponentAnalysis {
   id: string;
   name: string;
+  component_name?: string; // For backend compatibility
   type: ComponentType;
+  component_type?: string; // For backend compatibility
   description: string;
   props: ComponentProp[];
   children?: ComponentAnalysis[];
@@ -56,7 +59,7 @@ export interface ComponentProp {
   name: string;
   type: string;
   required: boolean;
-  defaultValue?: any;
+  defaultValue?: string | number | boolean | null;
   description: string;
 }
 
@@ -182,18 +185,24 @@ export interface GenerationOptions {
 // Generation Result Types
 export interface GenerationResult {
   components: GeneratedComponent[];
-  files: GeneratedFile[];
+  files?: GeneratedFile[];
+  designSystem?: DesignSystem;
+  metadata?: Record<string, unknown>;
+  stats?: Record<string, unknown>;
   success: boolean;
-  message: string;
+  message?: string;
   generatedAt: Date;
 }
 
 export interface GeneratedComponent {
   name: string;
   code: string;
-  type: ComponentType;
+  tsx_code?: string; // For backend compatibility
+  css_code?: string; // For backend compatibility
+  type: ComponentType | string; // Allow string for backend compatibility
   description: string;
   dependencies: string[];
+  props?: Array<{name: string; type: string; required: boolean}>;
 }
 
 export interface GeneratedFile {
@@ -277,7 +286,7 @@ export interface SectionContent {
   images?: string[];
   links?: NavigationItem[];
   forms?: FormInfo[];
-  data?: any;
+  data?: Record<string, unknown>;
 }
 
 export interface FormInfo {
