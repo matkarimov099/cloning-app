@@ -1,24 +1,31 @@
 // AI Website Analysis Types
 export interface WebsiteAnalysis {
-	url: string;
-	title: string;
-	description: string;
-	screenshot?: string;
-	favicon?: string;
-	metadata: {
-		keywords: string[];
-		author?: string;
-		language: string;
-		theme: 'light' | 'dark' | 'auto';
-	};
-	structure: PageStructure;
-	components: ComponentAnalysis[];
-	extracted_components?: ComponentAnalysis[]; // For backend compatibility
-	pages?: PageInfo[];
-	assets: AssetInfo[];
-	technologies: DetectedTechnology[];
-	designSystem: DesignSystem;
-	analyzedAt: Date;
+  url: string;
+  title: string;
+  description: string;
+  screenshot?: string;
+  favicon?: string;
+  metadata?: {
+    keywords?: string[];
+    author?: string;
+    language?: string;
+    theme?: 'light' | 'dark' | 'auto';
+    responsive?: boolean;
+    [key: string]: unknown;
+  };
+  structure?: PageStructure;
+  components?: ComponentAnalysis[];
+  extracted_components?: ComponentAnalysis[]; // For backend compatibility
+  pages?: PageInfo[];
+  assets?: AssetInfo[];
+  technologies?: DetectedTechnology[];
+  designSystem?: DesignSystem;
+  analyzedAt?: Date;
+
+  // AI natijalari uchun qo'shimcha maydonlar (optional)
+  ai_provider?: string;
+  raw_response?: Record<string, unknown>;
+  [key: string]: unknown; // Allow any additional fields for flexibility with different API responses
 }
 
 export interface PageStructure {
@@ -96,13 +103,18 @@ export interface SpacingInfo {
 	margins: string[];
 	paddings: string[];
 	gaps: string[];
+	containerWidths?: string[]; // Mock data uchun qo'shimcha maydon
 }
 
 export interface LayoutInfo {
-	display: string[];
-	positioning: string[];
+	display?: string[];
+	positioning?: string[];
 	flexbox?: FlexboxInfo;
 	grid?: GridInfo;
+	type?: string; // Mock data uchun qo'shimcha maydon
+	direction?: string; // Mock data uchun qo'shimcha maydon
+	justify?: string; // Mock data uchun qo'shimcha maydon
+	align?: string; // Mock data uchun qo'shimcha maydon
 }
 
 export interface FlexboxInfo {
@@ -134,15 +146,52 @@ export interface AssetInfo {
 
 export interface DetectedTechnology {
 	name: string;
-	category: 'framework' | 'library' | 'tool' | 'service';
+	category: 'framework' | 'library' | 'tool' | 'service' | 'language' | 'styling' | 'state'; // Mock data uchun qo'shimcha kategoriyalar
 	confidence: number; // 0-1
 	version?: string;
 }
 
 export interface DesignSystem {
-	tokens: DesignToken[];
-	components: ComponentTemplate[];
-	patterns: DesignPattern[];
+	tokens?: DesignToken[];
+	components?: ComponentTemplate[];
+	patterns?: DesignPattern[];
+	// Mock data uchun qo'shimcha maydonlar
+	colors?: {
+		primary?: string;
+		secondary?: string;
+		background?: string;
+		text?: string;
+		accents?: string[];
+	};
+	typography?: {
+		fontFamily?: string;
+		headings?: {
+			fontFamily?: string;
+			weights?: number[];
+		};
+		body?: {
+			fontFamily?: string;
+			weights?: number[];
+		};
+	};
+	spacing?: {
+		scale?: number[];
+		containers?: {
+			max?: string;
+			default?: string;
+		};
+	};
+	borderRadius?: {
+		small?: string;
+		default?: string;
+		large?: string;
+	};
+	breakpoints?: {
+		sm?: string;
+		md?: string;
+		lg?: string;
+		xl?: string;
+	};
 }
 
 export interface DesignToken {
@@ -277,7 +326,8 @@ export type ComponentType =
 	| 'data'
 	| 'input'
 	| 'button'
-	| 'text';
+	| 'text'
+	| 'component'; // Mock data uchun qo'shimcha tip
 export type ProjectStatus =
 	| 'pending'
 	| 'analyzing'
@@ -290,6 +340,7 @@ export type ProjectStatus =
 
 export interface NavigationInfo {
 	type: 'horizontal' | 'vertical' | 'sidebar' | 'hamburger';
+	position?: string; // Mock data uchun qo'shimcha maydon
 	items: NavigationItem[];
 	branding?: BrandingInfo;
 }
